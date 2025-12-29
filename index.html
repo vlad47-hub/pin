@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PHAZR | Wide Dashboard</title>
+    <style>
+        :root { --p-red: #e60023; --dark-bg: #0f0f0f; --card-bg: #1a1a1a; }
+        body { font-family: -apple-system, sans-serif; background: var(--dark-bg); color: white; margin: 0; display: flex; }
+        
+        /* Sidebar */
+        .sidebar { width: 260px; background: #000; height: 100vh; position: fixed; border-right: 1px solid #333; padding: 25px; box-sizing: border-box; }
+        .sidebar h1 { color: var(--p-red); font-size: 26px; letter-spacing: -1px; margin-bottom: 40px; }
+        .nav-btn { display: block; width: 100%; padding: 15px; margin: 8px 0; border: none; text-align: left; 
+                   background: none; color: #aaa; border-radius: 12px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .nav-btn:hover { background: #222; color: white; }
+        .active { background: #333 !important; color: white; }
+
+        /* Main Feed */
+        .main { flex-grow: 1; margin-left: 260px; padding: 40px; display: flex; flex-direction: column; align-items: center; }
+        .header-tools { width: 100%; max-width: 850px; margin-bottom: 40px; }
+        .search-bar { width: 100%; padding: 18px 30px; border-radius: 40px; border: 1px solid #333; background: #222; color: white; font-size: 16px; outline: none; }
+
+        /* Wide Pin Styling */
+        .wide-feed { width: 100%; max-width: 850px; }
+        .wide-pin { 
+            background: var(--card-bg); 
+            border-radius: 24px; 
+            margin-bottom: 60px; 
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            border: 1px solid #222;
+        }
+        .wide-pin img { 
+            width: 100%; 
+            display: block; 
+            height: auto; 
+            max-height: 85vh; 
+            object-fit: cover; 
+        }
+        .pin-footer { padding: 25px; background: linear-gradient(to top, #111, transparent); }
+        .pin-title { font-size: 20px; font-weight: bold; margin-bottom: 8px; color: #fff; }
+        .pin-board { font-size: 12px; color: var(--p-red); text-transform: uppercase; font-weight: 800; letter-spacing: 1px; }
+
+        /* Loading Animation */
+        .loader { padding: 50px; color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h1>PHAZR</h1>
+        <button class="nav-btn active" onclick="loadContent('boards', this)">Saved Feed</button>
+        <button class="nav-btn" onclick="loadContent('search', this)">Discovery Mode</button>
+    </div>
+
+    <div class="main">
+        <div class="header-tools" id="search-box" style="display:none;">
+            <input type="text" id="query-input" class="search-bar" placeholder="Phase through global pins..." onkeypress="if(event.key==='Enter') runSearch()">
+        </div>
+
+        <div class="wide-feed" id="content-area">
+            <div class="loader">Waking up the engine...</div>
+        </div>
+    </div>
+
+    <script>
+        async function loadContent(mode, btn) {
+            // UI Toggle
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('search-box').style.display = (mode === 'search') ? 'block' : 'none';
+            
+            const area = document.getElementById('content-area');
+            area.innerHTML = '<div class="loader">Phasing media...</div>';
+
+            if (mode === 'boards') {
+                const res = await fetch('/api/dashboard/boards');
+                const boards = await res.json();
+                
+                // Flatten all pins from all boards into one wide list
+                const allPins = boards.flatMap(board => board.pins.map(p => ({...p, boardName: board.name})));
+                renderWide(allPins);
+            }
+        }
+
+        function renderWide(pins) {
+            const area = document.getElementById('content-area');
+            if (!pins || pins.length === 0) {
+                area.innerHTML = '<div class="loader">No media found in this phase.</div>';
+                return;
+            }
+
+            area.innerHTML = pins.map(p => `
+                <div class="wide-pin">
+                    <img src="${p.url}" alt="${p.title}" onerror="this.src='https://via.placeholder.com/800x400?text=Private+Media'">
+                    <div class="pin-footer">
+                        <div class="pin-board">${p.boardName || 'GLOBAL'}</div>
+                        <div class="pin-title">${p.title}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function runSearch() {
+            const q = document.getElementById('query-input').value;
+            const res = await fetch(`/api/dashboard/search?q=${q}`);
+            const data = await res.json();
+            renderWide(data.map(p => ({...p, boardName: 'Discovery'})));
+        }
+
+        // Default: Load boards on start
+        loadContent('boards', document.querySelector('.nav-btn'));
+    </script>
+</body>
+</html>
